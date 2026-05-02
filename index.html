@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHTmayn v7.0 | Cloud Edition</title>
+    <style>
+        :root {
+            --accent: #10b981;
+            --bg: #0a0a0c;
+            --panel: #16161e;
+            --text: #e1e1e6;
+            --border: rgba(255, 255, 255, 0.08);
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        [data-theme="light"] {
+            --accent: #059669; --bg: #f4f4f5; --panel: #ffffff; --text: #18181b; --border: rgba(0, 0, 0, 0.1); --glass: rgba(0, 0, 0, 0.03);
+        }
+
+        [data-theme="minecraft"] {
+            --accent: #facc15; --bg: #3f2e1e; --panel: #5d4037; --text: #fff; --border: #8d6e63; --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; transition: 0.2s ease; }
+        body { background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+
+        /* SIDEBAR */
+        .sidebar { width: 70px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 20px; z-index: 100; }
+        .avatar { width: 45px; height: 45px; border-radius: 12px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; color: white; border: 2px solid var(--border); }
+        .side-item { width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; opacity: 0.6; }
+        .side-item:hover { background: var(--glass); opacity: 1; }
+
+        /* MAIN CONTENT */
+        .main { flex-grow: 1; display: flex; flex-direction: column; position: relative; }
+        .toolbar { height: 60px; background: var(--panel); display: flex; align-items: center; padding: 0 20px; gap: 15px; border-bottom: 1px solid var(--border); }
+        .address-bar { flex-grow: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; padding: 8px 15px; }
+        .address-bar input { background: none; border: none; outline: none; width: 100%; color: var(--text); }
+
+        /* MODALS */
+        .modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel); padding: 30px; border-radius: 24px; border: 1px solid var(--border); z-index: 1000; display: none; width: 350px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; display: none; backdrop-filter: blur(5px); }
+
+        /* FORM STYLES */
+        input.field { width: 100%; padding: 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); margin-bottom: 15px; outline: none; }
+        .btn-green { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--accent); color: white; font-weight: bold; cursor: pointer; }
+
+        /* HOME UI */
+        #home-view { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 30px; }
+        .tile { background: var(--glass); padding: 25px; border-radius: 20px; border: 1px solid var(--border); cursor: pointer; width: 130px; backdrop-filter: blur(10px); }
+        .tile:hover { transform: translateY(-5px); border-color: var(--accent); }
+
+        #mc-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.3; }
+        iframe { width: 100%; height: 100%; border: none; display: none; background: white; }
+    </style>
+</head>
+<body>
+
+    <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
+
+    <div class="modal" id="account-modal">
+        <h2 id="modal-title">Создать SHTmayn ID</h2>
+        <p id="modal-desc" style="opacity: 0.6; font-size: 13px; margin-bottom: 20px;">Войдите, чтобы сохранять настройки.</p>
+        <div id="auth-form">
+            <input type="text" id="username" class="field" placeholder="Ваше имя">
+            <button class="btn-green" onclick="saveProfile()">Зарегистрироваться</button>
+        </div>
+        <div id="profile-info" style="display: none; text-align: center;">
+            <div class="avatar" id="big-avatar" style="width: 80px; height: 80px; font-size: 30px; margin: 0 auto 15px;">?</div>
+            <h3 id="display-name">User</h3>
+            <p style="opacity: 0.5; margin-bottom: 20px;">SHTmayn Beta Tester</p>
+            <button class="btn-green" style="background: #ef4444;" onclick="logout()">Выйти</button>
+        </div>
+    </div>
+
+    <div class="modal" id="settings-modal">
+        <h2>Настройки</h2>
+        <div style="margin: 20px 0;">
+            <label style="display:block; margin-bottom:10px;">Тема интерфейса:</label>
+            <select class="field" onchange="setTheme(this.value)" id="theme-select">
+                <option value="dark">Обсидиан (Тёмная)</option>
+                <option value="light">Светлая</option>
+                <option value="minecraft">Золотая (Minecraft)</option>
+            </select>
+
+            <label style="display:block; margin-bottom:10px;">Поисковый движок:</label>
+            <select class="field" id="engine-select">
+                <option value="https://duckduckgo.com/?q=">DuckDuckGo (Рекомендуется)</option>
+                <option value="https://www.bing.com/search?q=">Bing AI</option>
+                <option value="https://yandex.ru/search/?text=">Yandex</option>
+            </select>
+        </div>
+        <button class="btn-green" onclick="closeAllModals()">Готово</button>
+    </div>
+
+    <aside class="sidebar">
+        <div class="avatar" id="side-avatar" onclick="openAccount()">?</div>
+        <div class="side-item" onclick="goHome()">🏠</div>
+        <div class="side-item" onclick="openSettings()">⚙️</div>
+        <div style="flex-grow: 1;"></div>
+        <div class="side-item" onclick="alert('Облако активно')">☁️</div>
+    </aside>
+
+    <main class="main">
+        <canvas id="mc-canvas"></canvas>
+        <header class="toolbar">
+            <div class="address-bar">
+                <span>🌐</span>
+                <input type="text" id="address-input" placeholder="Введите адрес или ищите..." onkeydown="handleEnter(event)">
+            </div>
+            <button class="side-item" onclick="window.open(document.getElementById('address-input').value, '_blank')">↗</button>
+        </header>
+
+        <div id="home-view">
+            <h1 style="font-size: 70px; letter-spacing: -3px;">sht<span>mayn</span></h1>
+            <p style="opacity: 0.4;">v7.0 Cloud Edition • Build 2026</p>
+            
+            <div class="grid">
+                <div class="tile" onclick="navigate('https://github.com')">🐙 GitHub</div>
+                <div class="tile" onclick="navigate('https://classic.minecraft.net')">⛏️ Minecraft</div>
+                <div class="tile" onclick="navigate('https://youtube.com')">📺 YouTube</div>
+                <div class="tile" onclick="openAccount()">👤 Профиль</div>
+            </div>
+        </div>
+
+        <iframe id="browser-frame"></iframe>
+    </main>
+
+    <script>
+        // ИНИЦИАЛИЗАЦИЯ ДАННЫХ
+        let user = JSON.parse(localStorage.getItem('sht_user')) || null;
+        
+        window.onload = () => {
+            if (user) updateUI();
+            initCanvas();
+        };
+
+        // СИСТЕМА АККАУНТОВ
+        function openAccount() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('account-modal').style.display = 'block';
+            if (user) {
+                document.getElementById('auth-form').style.display = 'none';
+                document.getElementById('profile-info').style.display = 'block';
+                document.getElementById('modal-title').innerText = "Ваш SHTmayn ID";
+                document.getElementById('display-name').innerText = user.name;
+                document.getElementById('big-avatar').innerText = user.name[0].toUpperCase();
+            }
+        }
+
+        function saveProfile() {
+            const name = document.getElementById('username').value.trim();
+            if (name) {
+                user = { name: name, theme: 'dark' };
+                localStorage.setItem('sht_user', JSON.stringify(user));
+                updateUI();
+                closeAllModals();
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('sht_user');
+            user = null;
+            location.reload();
+        }
+
+        function updateUI() {
+            const letter = user.name[0].toUpperCase();
+            document.getElementById('side-avatar').innerText = letter;
+            document.getElementById('side-avatar').style.background = '#10b981';
+        }
+
+        // НАСТРОЙКИ
+        function openSettings() {
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('settings-modal').style.display = 'block';
+        }
+
+        function setTheme(t) {
+            document.documentElement.setAttribute('data-theme', t);
+        }
+
+        function closeAllModals() {
+            document.querySelectorAll('.modal, .overlay').forEach(el => el.style.display = 'none');
+        }
+
+        // НАВИГАЦИЯ
+        function handleEnter(e) { if (e.key === 'Enter') navigate(e.target.value); }
+
+        function navigate(val) {
+            let url = val.trim();
+            if (!url) return;
+            const engine = document.getElementById('engine-select').value;
+
+            if (!url.includes('.') || url.includes(' ')) {
+                url = engine + encodeURIComponent(url);
+            } else {
+                if (!url.startsWith('http')) url = 'https://' + url;
+            }
+
+            document.getElementById('address-input').value = url;
+            document.getElementById('home-view').style.display = 'none';
+            const frame = document.getElementById('browser-frame');
+            frame.style.display = 'block';
+            frame.src = url;
+        }
+
+        function goHome() {
+            document.getElementById('home-view').style.display = 'flex';
+            document.getElementById('browser-frame').style.display = 'none';
+            document.getElementById('browser-frame').src = '';
+            document.getElementById('address-input').value = '';
+        }
+
+        // MINECRAFT AI BACKGROUND
+        const canvas = document.getElementById('mc-canvas');
+        const ctx = canvas.getContext('2d');
+        let blocks = [];
+
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            for(let i=0; i<30; i++) {
+                blocks.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: Math.random()*40+20 });
+            }
+            animate();
+        }
+
+        function animate() {
+            ctx.clearRect(0,0,canvas.width, canvas.height);
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent');
+            blocks.forEach(b => {
+                ctx.globalAlpha = 0.05;
+                ctx.fillRect(b.x, b.y, b.s, b.s);
+                b.y -= 0.2;
+                if (b.y < -50) b.y = canvas.height + 50;
+            });
+            requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+</html>
